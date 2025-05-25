@@ -71,10 +71,11 @@ void generate_components(fourier_component fourier_series[], const int& fourier_
     std::uniform_real_distribution<float> amplitude_dist(0.0f, amplitude_range);
     std::uniform_real_distribution<float> phase_dist(0.0f, phase_range);
     std::uniform_real_distribution<float> noise(-0.1f, 0.1f);
+    std::uniform_real_distribution<float> angular_velocity_dist(-base_angular_velocity, base_angular_velocity);
 
     for (int n = 0; n < fourier_series_size; n++) {
         fourier_series[n].n_degree = n;
-        fourier_series[n].angular_velocity = base_angular_velocity * n + noise(gen);
+        fourier_series[n].angular_velocity = angular_velocity_dist(gen);
         fourier_series[n].amplitude = amplitude_dist(gen);
         fourier_series[n].phase = phase_dist(gen);
     }
@@ -113,7 +114,7 @@ void discrete_fourier_transform(std::vector<fourier_component>& components,
             sum += std::complex<float>(samples[k], 0.0f) * std::exp(std::complex<float>(0.0f, angle));
         }
 
-        float amplitude = std::abs(sum) / N;
+        float amplitude = 2 * std::abs(sum) / N;
         float phase = std::arg(sum);
         float angular_velocity = 2.0f * M_PI * n / T;
 
@@ -147,7 +148,7 @@ void PID_customed(const std::map<float, float>& positions, const std::string fil
     - Smooth value of the PI output
     */
 
-    const int window_size = 7;
+    const int window_size = 5;
     const float Kp = 1.0f;
     const float Ki = 0.01f;
     const float smoothing = 0.5f;
@@ -159,7 +160,7 @@ void PID_customed(const std::map<float, float>& positions, const std::string fil
     bool initialized = false;
 
     std::ofstream outputFile(file_name);
-    outputFile << "Time, Current Position, Running Average" << "(" << window_size << "), Error, PI Output, Smoothed Output\n";
+    outputFile << "time, running_average" << "(" << window_size << "), position_error, PI_output, smoothed_output\n";
 
     for (const auto& [time, current_position] : positions) {
         // Add to running window
@@ -190,7 +191,7 @@ void PID_customed(const std::map<float, float>& positions, const std::string fil
         previous_output = smoothed;
 
         // Write to CSV
-        outputFile << time << "," << current_position << "," << avg << "," << error << "," << pi_output << "," << smoothed << "\n";
+        outputFile << time  << "," << avg << "," << error << "," << pi_output << "," << smoothed << "\n";
     }
 }
 
@@ -214,7 +215,8 @@ void Kalman_filter(const std::map<float, float>& positions, const std::string fi
     bool initialized = false;
 
     std::ofstream outputFile(file_name);
-    outputFile << "Time, Current Position, Running Average" << "(" << window_size << "), Error, PI Output, Smoothed Output, Measurement, PID Out, Kalman Estimate, Kalman Gain\n";
+    outputFile << "time, running_average" << "(" << window_size << "), position_error, "
+               << "PI_output, smoothed_output, PID_out, kalman_estimate, kalman_gain\n";
 
     for (const auto& [time, measurement] : positions) {
         // ---- Running Average ----
@@ -246,8 +248,8 @@ void Kalman_filter(const std::map<float, float>& positions, const std::string fi
         P = (1 - K) * P_prior;
 
         // Write to CSV
-        outputFile << time << "," << measurement << "," << average << "," << error << "," << pi_output << "," 
-        << smoothed_pid << "," << measurement << "," << smoothed_pid << "," << x_hat << "," << K << "\n";
+        outputFile << time << "," << average << "," << error << "," << pi_output << "," 
+        << smoothed_pid << "," << smoothed_pid << "," << x_hat << "," << K << "\n";
     }
 }
 
@@ -264,7 +266,7 @@ void alternative_Kalman_filter(const std::map<float, float>& positions, const st
     }
 
     // Header for CSV output
-    out << "time,measured_position,predicted_position,filtered_position,position_error,"
+    out << "time,predicted_position,filtered_position,position_error,"
         << "kalman_gain_position,kalman_gain_velocity\n";
 
     // Initial state: [position, velocity]
@@ -317,7 +319,7 @@ void alternative_Kalman_filter(const std::map<float, float>& positions, const st
         p22 = -k2 * p12_pred + p22_pred;
 
         // Output to file
-        out << curr_time << "," << z << "," << x_pred << "," << x << "," << y << "," << k1 << "," << k2 << "\n";
+        out << curr_time << "," << x_pred << "," << x << "," << y << "," << k1 << "," << k2 << "\n";
 
         prev_time = curr_time;
     }
@@ -407,7 +409,7 @@ void extended_Kalman_filter(const std::map<float, float>& positions, const std::
     if (positions.size() < 2) return;
 
     std::ofstream out(file_name);
-    out << "time,measured_position,predicted_position,filtered_position,position_error\n";
+    out << "time,predicted_position,filtered_position,position_error\n";
 
     float x = 0.0f; // position
     float v = 0.0f; // velocity
@@ -454,7 +456,7 @@ void extended_Kalman_filter(const std::map<float, float>& positions, const std::
         p21 = -k2 * p11_pred + p21_pred;
         p22 = -k2 * p12_pred + p22_pred;
 
-        out << t << "," << z << "," << x_pred << "," << x << "," << y << "\n";
+        out << t << "," << x_pred << "," << x << "," << y << "\n";
         prev_time = t;
     }
 
@@ -463,12 +465,12 @@ void extended_Kalman_filter(const std::map<float, float>& positions, const std::
 
 int main() {
     const float pi = 3.14159f;
-    const float angular_velocity = 5 * pi;
-    const float amplitude = 10;
-    const float phase = 2 * pi; // phase range now 0 to pi
-    const float time_span = 10;
-    const float time_step = 0.1f;
-    const int max_degree = 25;
+    const float angular_velocity = 3 * pi;
+    const float amplitude = 20;
+    const float phase = 1 * pi; // phase range now 0 to pi
+    const float time_span = 100;
+    const float time_step = 0.5f;
+    const int max_degree = 5;
 
     fourier_component fourier_series[max_degree];
     generate_components(fourier_series, max_degree, angular_velocity, amplitude, phase);
@@ -491,8 +493,8 @@ int main() {
     report_trajectory(fourier_series, max_degree, reconstructed_positions, "inverted_trajectory_");
 
     // ----- PID controller -----
-    PID_customed(positions, "pid1.csv");
-    PID_customed(reconstructed_positions, "pid2.csv");
+    PID_customed(positions, "PID1.csv");
+    PID_customed(reconstructed_positions, "PID2.csv");
 
     // ----- Kalman Filter -----
     Kalman_filter(positions, "kalman1.csv");
@@ -507,8 +509,8 @@ int main() {
     Luenberger_observer(reconstructed_positions, "luenberger2.csv");
 
     // ----- LQR observer -----
-    LQR_observer(positions, "lqr1.csv");
-    LQR_observer(reconstructed_positions, "lqr2.csv");
+    LQR_observer(positions, "LQR1.csv");
+    LQR_observer(reconstructed_positions, "LQR2.csv");
 
     // ----- Extended Kalman Filter -----
     extended_Kalman_filter(positions, "extended_kalman1.csv");
