@@ -7,6 +7,8 @@
 #include <deque>
 #include <numeric>
 
+const float cap_threshold = 10.0f;
+
 // Compact Fourier series
 struct fourier_component {
     float angular_velocity;
@@ -34,7 +36,7 @@ std::map<float, float> compute_trajectory(const float& initial_condition,
         for (int j = 0; j < fourier_series_size; j++) {
             position += fourier_series[j].compute_component(time);
         }
-        positions[time] = position;
+        positions[time] = abs(position) > cap_threshold ? cap_threshold * (abs(position) / position) : position;
     }
 
     return positions;
@@ -71,10 +73,12 @@ void generate_components(fourier_component fourier_series[], const int& fourier_
     std::uniform_real_distribution<float> amplitude_dist(0.0f, amplitude_range);
     std::uniform_real_distribution<float> phase_dist(0.0f, phase_range);
     std::uniform_real_distribution<float> noise(-0.1f, 0.1f);
+    // std::uniform_int_distribution<int> angular_velocity_dist(0, fourier_series_size);
     std::uniform_real_distribution<float> angular_velocity_dist(-base_angular_velocity, base_angular_velocity);
 
     for (int n = 0; n < fourier_series_size; n++) {
         fourier_series[n].n_degree = n;
+        // fourier_series[n].angular_velocity = angular_velocity_dist(gen) * base_angular_velocity;
         fourier_series[n].angular_velocity = angular_velocity_dist(gen);
         fourier_series[n].amplitude = amplitude_dist(gen);
         fourier_series[n].phase = phase_dist(gen);
@@ -160,7 +164,7 @@ void PID_customed(const std::map<float, float>& positions, const std::string fil
     bool initialized = false;
 
     std::ofstream outputFile(file_name);
-    outputFile << "time, running_average" << "(" << window_size << "), position_error, PI_output, smoothed_output\n";
+    outputFile << "time, running_average" << "(" << window_size << "), position_error, PI_output, smoothed_output, total_output\n";
 
     for (const auto& [time, current_position] : positions) {
         // Add to running window
@@ -191,7 +195,7 @@ void PID_customed(const std::map<float, float>& positions, const std::string fil
         previous_output = smoothed;
 
         // Write to CSV
-        outputFile << time  << "," << avg << "," << error << "," << pi_output << "," << smoothed << "\n";
+        outputFile << time  << "," << avg << "," << error << "," << pi_output << "," << smoothed << "," << -(pi_output+smoothed) << "\n";
     }
 }
 
@@ -248,7 +252,7 @@ void Kalman_filter(const std::map<float, float>& positions, const std::string fi
         P = (1 - K) * P_prior;
 
         // Write to CSV
-        outputFile << time << "," << average << "," << error << "," << pi_output << "," 
+        outputFile << time << "," << average << "," << -error << "," << pi_output << "," 
         << smoothed_pid << "," << smoothed_pid << "," << x_hat << "," << K << "\n";
     }
 }
@@ -466,11 +470,11 @@ void extended_Kalman_filter(const std::map<float, float>& positions, const std::
 int main() {
     const float pi = 3.14159f;
     const float angular_velocity = 3 * pi;
-    const float amplitude = 20;
-    const float phase = 1 * pi; // phase range now 0 to pi
+    const float amplitude = 4;
+    const float phase = 3 * pi; // phase range now 0 to pi
     const float time_span = 100;
     const float time_step = 0.5f;
-    const int max_degree = 5;
+    const int max_degree = 10;
 
     fourier_component fourier_series[max_degree];
     generate_components(fourier_series, max_degree, angular_velocity, amplitude, phase);
