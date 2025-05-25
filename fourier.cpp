@@ -147,12 +147,13 @@ void PID_customed(const std::map<float, float>& positions, const std::string fil
     - Smooth value of the PI output
     */
 
-    const int window_size = 5;
-    const float Kp = 2.0f;
-    const float Ki = 0.1f;
+    const int window_size = 7;
+    const float Kp = 1.0f;
+    const float Ki = 0.01f;
     const float smoothing = 0.5f;
 
     std::deque<float> window;
+    window.resize(window_size);
     float integral = 0.0f;
     float previous_output = 0.0f;
     bool initialized = false;
@@ -252,12 +253,12 @@ void Kalman_filter(const std::map<float, float>& positions, const std::string fi
 
 int main() {
     const float pi = 3.14159f;
-    const float angular_velocity = 1 * pi;
-    const float amplitude = 5;
-    const float phase = 1 * pi; // phase range now 0 to pi
-    const float time_span = 10;
-    const float time_step = 0.01f;
-    const int max_degree = 20;
+    const float angular_velocity = 5 * pi;
+    const float amplitude = 10;
+    const float phase = 2 * pi; // phase range now 0 to pi
+    const float time_span = 100;
+    const float time_step = 0.1f;
+    const int max_degree = 25;
 
     fourier_component fourier_series[max_degree];
     generate_components(fourier_series, max_degree, angular_velocity, amplitude, phase);
