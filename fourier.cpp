@@ -42,29 +42,25 @@ std::map<float, float> compute_trajectory(const float& initial_condition,
 
 void report_trajectory(fourier_component fourier_series[], const int& fourier_series_size,
                        const std::map<float, float>& positions, const std::string& filename) {
-    // Initialize the output file
-    std::ofstream outputFile(filename);
-    outputFile << "# Trajectory Report\n\n";
-
-    // Write the Fourier components to the output file
-    outputFile << "## Fourier components\n\n";
-    outputFile << "| n | Angular Velocity | Amplitude | Phase |\n";
-    outputFile << "| --- | --- | --- | --- |\n";
+    // Component report
+    std::ofstream componentFile(filename + "component.csv");
+    componentFile << "n,angular_velocity,amplitude,phase\n";
 
     for (int i = 0; i < fourier_series_size; i++) {
-        outputFile << "| " << fourier_series[i].n_degree << " | " << fourier_series[i].angular_velocity << " | " << fourier_series[i].amplitude << " | " << fourier_series[i].phase << " |\n";
+        componentFile << fourier_series[i].n_degree << "," << fourier_series[i].angular_velocity << "," << fourier_series[i].amplitude << "," << fourier_series[i].phase << "\n";
     }
 
-    // Write the positions to the output file
-    outputFile << "\n## Positions\n\n";
-    outputFile << "| Time | Position |\n";
-    outputFile << "| --- | --- |\n";
+    componentFile.close();
+
+    // Position report
+    std::ofstream positionFile(filename + "position.csv");
+    positionFile << "time,position\n";
 
     for (const auto& position : positions) {
-        outputFile << "| " << position.first << " | " << position.second << " |\n";
+        positionFile << position.first << "," << position.second << "\n";
     }
 
-    outputFile.close();
+    positionFile.close();
 }
 
 void generate_components(fourier_component fourier_series[], const int& fourier_series_size,
@@ -87,9 +83,12 @@ void generate_components(fourier_component fourier_series[], const int& fourier_
 void discrete_fourier_transform(std::vector<fourier_component>& components,
                                 const std::map<float, float>& positions) {
     const int N = positions.size();
-    if (N == 0) return;
+    if (N == 0) {
+        std::cout << "No data points provided." << std::endl;
+        return;
+    }
 
-    // Extract positions into an array
+    // Extract samples
     std::vector<float> samples;
     samples.reserve(N);
     for (const auto& [t, x] : positions) {
@@ -103,7 +102,7 @@ void discrete_fourier_transform(std::vector<fourier_component>& components,
     float t1 = it->first;
     float dt = t1 - t0;
 
-    const float T = N * dt; // total duration
+    const float T = N * dt;
     components.clear();
     components.reserve(N);
 
@@ -118,7 +117,8 @@ void discrete_fourier_transform(std::vector<fourier_component>& components,
         float phase = std::arg(sum);
         float angular_velocity = 2.0f * M_PI * n / T;
 
-        components.push_back({angular_velocity, amplitude * 2.0f, phase, n});  // multiply by 2 (except DC) if reconstructing real signal
+        float scaled_amplitude = (n == 0) ? amplitude : amplitude * 2.0f;
+        components.push_back({angular_velocity, scaled_amplitude, phase, n});
     }
 }
 
@@ -251,26 +251,244 @@ void Kalman_filter(const std::map<float, float>& positions, const std::string fi
     }
 }
 
+void alternative_Kalman_filter(const std::map<float, float>& positions, const std::string file_name) {
+    if (positions.size() < 2) {
+        std::cout << "Not enough data for filtering." << std::endl;
+        return;
+    }
+
+    std::ofstream out(file_name);
+    if (!out.is_open()) {
+        std::cerr << "Failed to open file for writing: " << file_name << std::endl;
+        return;
+    }
+
+    // Header for CSV output
+    out << "time,measured_position,predicted_position,filtered_position,position_error,"
+        << "kalman_gain_position,kalman_gain_velocity\n";
+
+    // Initial state: [position, velocity]
+    float x = 0.0f;       // Estimated position
+    float v = 0.0f;       // Estimated velocity
+
+    // Initial estimation covariance matrix
+    float p11 = 1.0f, p12 = 0.0f;
+    float p21 = 0.0f, p22 = 1.0f;
+
+    // Process noise covariance (Q) and measurement noise (R)
+    const float q = 0.01f;
+    const float r = 1.0f;
+
+    auto it = positions.begin();
+    float prev_time = it->first;
+    float z = it->second;
+
+    // Initialize state from first measurement
+    x = z;
+    v = 0.0f;
+    ++it;
+
+    for (; it != positions.end(); ++it) {
+        float curr_time = it->first;
+        float dt = curr_time - prev_time;
+        z = it->second;
+
+        // ---------- Predict ----------
+        float x_pred = x + v * dt;
+        float v_pred = v;
+
+        float p11_pred = p11 + dt * (p12 + p21 + dt * p22) + q;
+        float p12_pred = p12 + dt * p22;
+        float p21_pred = p21 + dt * p22;
+        float p22_pred = p22 + q;
+
+        // ---------- Update ----------
+        float y = z - x_pred; // innovation (error)
+        float s = p11_pred + r;
+        float k1 = p11_pred / s;
+        float k2 = p21_pred / s;
+
+        x = x_pred + k1 * y;
+        v = v_pred + k2 * y;
+
+        p11 = (1 - k1) * p11_pred;
+        p12 = (1 - k1) * p12_pred;
+        p21 = -k2 * p11_pred + p21_pred;
+        p22 = -k2 * p12_pred + p22_pred;
+
+        // Output to file
+        out << curr_time << "," << z << "," << x_pred << "," << x << "," << y << "," << k1 << "," << k2 << "\n";
+
+        prev_time = curr_time;
+    }
+
+    out.close();
+}
+
+void Luenberger_observer(const std::map<float, float>& positions, const std::string file_name) {
+    if (positions.size() < 2) return;
+
+    std::ofstream out(file_name);
+    out << "time,measured_position,estimated_position\n";
+
+    float x = 0.0f;   // estimated position
+    float v = 0.0f;   // estimated velocity
+
+    // Observer gains (tuned manually)
+    const float L1 = 0.5f;
+    const float L2 = 0.1f;
+
+    auto it = positions.begin();
+    float prev_time = it->first;
+    float z = it->second;
+    x = z;
+
+    ++it;
+    for (; it != positions.end(); ++it) {
+        float t = it->first;
+        float dt = t - prev_time;
+        z = it->second;
+
+        // Prediction
+        float x_pred = x + v * dt;
+
+        // Correction
+        float error = z - x_pred;
+        x = x_pred + L1 * error;
+        v = v + L2 * error;
+
+        out << t << "," << z << "," << x << "\n";
+        prev_time = t;
+    }
+
+    out.close();
+}
+
+void LQR_observer(const std::map<float, float>& positions, const std::string file_name) {
+    if (positions.size() < 2) return;
+
+    std::ofstream out(file_name);
+    out << "time,measured_position,estimated_position\n";
+
+    float x = 0.0f;
+    float v = 0.0f;
+
+    // Tuned LQR-style gains (derived from solving Riccati in real applications)
+    const float K1 = 0.8f;
+    const float K2 = 0.2f;
+
+    auto it = positions.begin();
+    float prev_time = it->first;
+    float z = it->second;
+    x = z;
+
+    ++it;
+    for (; it != positions.end(); ++it) {
+        float t = it->first;
+        float dt = t - prev_time;
+        z = it->second;
+
+        // Prediction
+        float x_pred = x + v * dt;
+
+        // Correction
+        float error = z - x_pred;
+        x = x_pred + K1 * error;
+        v = v + K2 * error;
+
+        out << t << "," << z << "," << x << "\n";
+        prev_time = t;
+    }
+
+    out.close();
+}
+
+void extended_Kalman_filter(const std::map<float, float>& positions, const std::string file_name) {
+    if (positions.size() < 2) return;
+
+    std::ofstream out(file_name);
+    out << "time,measured_position,predicted_position,filtered_position,position_error\n";
+
+    float x = 0.0f; // position
+    float v = 0.0f; // velocity
+
+    float p11 = 1.0f, p12 = 0.0f;
+    float p21 = 0.0f, p22 = 1.0f;
+
+    const float q = 0.01f; // process noise
+    const float r = 1.0f;  // measurement noise
+
+    auto it = positions.begin();
+    float prev_time = it->first;
+    float z = it->second;
+    x = z;
+
+    ++it;
+    for (; it != positions.end(); ++it) {
+        float t = it->first;
+        float dt = t - prev_time;
+        z = it->second;
+
+        // Jacobian H = [1 0], system F = [[1 dt], [0 1]]
+
+        // Predict
+        float x_pred = x + v * dt;
+        float v_pred = v;
+
+        float p11_pred = p11 + dt * (p12 + p21 + dt * p22) + q;
+        float p12_pred = p12 + dt * p22;
+        float p21_pred = p21 + dt * p22;
+        float p22_pred = p22 + q;
+
+        // Update
+        float y = z - x_pred;
+        float s = p11_pred + r;
+        float k1 = p11_pred / s;
+        float k2 = p21_pred / s;
+
+        x = x_pred + k1 * y;
+        v = v_pred + k2 * y;
+
+        p11 = (1 - k1) * p11_pred;
+        p12 = (1 - k1) * p12_pred;
+        p21 = -k2 * p11_pred + p21_pred;
+        p22 = -k2 * p12_pred + p22_pred;
+
+        out << t << "," << z << "," << x_pred << "," << x << "," << y << "\n";
+        prev_time = t;
+    }
+
+    out.close();
+}
+
 int main() {
     const float pi = 3.14159f;
     const float angular_velocity = 5 * pi;
     const float amplitude = 10;
     const float phase = 2 * pi; // phase range now 0 to pi
-    const float time_span = 100;
+    const float time_span = 10;
     const float time_step = 0.1f;
     const int max_degree = 25;
 
     fourier_component fourier_series[max_degree];
     generate_components(fourier_series, max_degree, angular_velocity, amplitude, phase);
     std::map<float, float> positions = compute_trajectory(0, fourier_series, max_degree, time_span, time_step);
-    report_trajectory(fourier_series, max_degree, positions, "trajectory_report.md");
+    report_trajectory(fourier_series, max_degree, positions, "trajectory_");
 
     // ----- Inverting signal to build Fourier model -----
     
     std::vector<fourier_component> discrete_fourier_series;
+    discrete_fourier_series.reserve(max_degree);
 
     discrete_fourier_transform(discrete_fourier_series, positions);
     std::map<float, float> reconstructed_positions = reconstruct_signal(discrete_fourier_series, positions);
+    for(int i = 0; i < max_degree; i++){
+        fourier_series[i].amplitude = discrete_fourier_series[i].amplitude;
+        fourier_series[i].angular_velocity = discrete_fourier_series[i].angular_velocity;
+        fourier_series[i].phase = discrete_fourier_series[i].phase;
+        fourier_series[i].n_degree = discrete_fourier_series[i].n_degree;
+    }
+    report_trajectory(fourier_series, max_degree, reconstructed_positions, "inverted_trajectory_");
 
     // ----- PID controller -----
     PID_customed(positions, "pid1.csv");
@@ -279,6 +497,22 @@ int main() {
     // ----- Kalman Filter -----
     Kalman_filter(positions, "kalman1.csv");
     Kalman_filter(reconstructed_positions, "kalman2.csv");
+
+    // ----- Alternative Kalman Filter -----
+    alternative_Kalman_filter(positions, "alternative_kalman1.csv");
+    alternative_Kalman_filter(reconstructed_positions, "alternative_kalman2.csv");
+
+    // ----- Luenberger observer -----
+    Luenberger_observer(positions, "luenberger1.csv");
+    Luenberger_observer(reconstructed_positions, "luenberger2.csv");
+
+    // ----- LQR observer -----
+    LQR_observer(positions, "lqr1.csv");
+    LQR_observer(reconstructed_positions, "lqr2.csv");
+
+    // ----- Extended Kalman Filter -----
+    extended_Kalman_filter(positions, "extended_kalman1.csv");
+    extended_Kalman_filter(reconstructed_positions, "extended_kalman2.csv");
 
     return 0;
 }
