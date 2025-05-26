@@ -6,6 +6,7 @@ This is an effort in modeling the path of a trajectory using multiple methods in
 
 - [Epicycles and deferents (complex Fourier series)](https://en.wikipedia.org/wiki/Deferent_and_epicycle)
 - [Forward kinematics transformation matrix (matrix manipulation, commonly used in robot manipulators)](https://en.wikipedia.org/wiki/Forward_kinematics)
+- [Closed loop 4 bar linkage system](https://en.wikipedia.org/wiki/Four-bar_linkage)
 
 ## Background
 

@@ -21,6 +21,21 @@ struct fourier_component {
     }
 };
 
+/**
+ * @brief Computes a trajectory based on a compact Fourier series representation.
+ *
+ * @param initial_condition Initial position value.
+ * @param fourier_series An array of Fourier components.
+ * @param fourier_series_size The number of components in the array.
+ * @param time_span The total time span of the trajectory.
+ * @param time_step The uniform time step between samples.
+ *
+ * @return A mapping of time stamps to position values.
+ *
+ * The trajectory is computed by summing the individual components of the
+ * Fourier series, starting from the initial condition. If the absolute value
+ * of the position exceeds the cap_threshold, it is clamped to that value.
+ */
 std::map<float, float> compute_trajectory(const float& initial_condition,
                         fourier_component fourier_series[],
                         const int fourier_series_size,
@@ -41,6 +56,22 @@ std::map<float, float> compute_trajectory(const float& initial_condition,
 
     return positions;
 }
+
+/**
+ * @brief Generates CSV reports for Fourier series components and trajectory positions.
+ *
+ * This function outputs two CSV files: one for the Fourier series components and 
+ * another for the trajectory positions. The component report includes details 
+ * such as the degree, angular velocity, amplitude, and phase of each Fourier 
+ * component. The position report provides a mapping of time stamps to position 
+ * values.
+ *
+ * @param fourier_series An array of Fourier components.
+ * @param fourier_series_size The number of components in the array.
+ * @param positions A map of time stamps to position values.
+ * @param filename The base name for the output CSV files. The function appends 
+ *        'component.csv' and 'position.csv' to this base name for the two reports.
+ */
 
 void report_trajectory(fourier_component fourier_series[], const int& fourier_series_size,
                        const std::map<float, float>& positions, const std::string& filename) {
@@ -65,6 +96,18 @@ void report_trajectory(fourier_component fourier_series[], const int& fourier_se
     positionFile.close();
 }
 
+/**
+ * @brief Generates an array of Fourier components with random amplitudes and phases.
+ *
+ * The angular velocities of the components are randomly generated between -base_angular_velocity and base_angular_velocity.
+ * The amplitudes are randomly generated between 0 and amplitude_range, and the phases are randomly generated between 0 and phase_range.
+ *
+ * @param fourier_series An array to store the generated Fourier components.
+ * @param fourier_series_size The size of the array.
+ * @param base_angular_velocity The base angular velocity used to generate the angular velocities of the components.
+ * @param amplitude_range The range of the amplitudes of the components.
+ * @param phase_range The range of the phases of the components.
+ */
 void generate_components(fourier_component fourier_series[], const int& fourier_series_size,
                          const float& base_angular_velocity, const float& amplitude_range, const float& phase_range) {
     std::random_device rd;
@@ -85,6 +128,20 @@ void generate_components(fourier_component fourier_series[], const int& fourier_
     }
 }
 
+/**
+ * @brief Computes the discrete Fourier transform of a time series signal.
+ *
+ * Given a sequence of N time-domain samples in the positions map, this function
+ * computes the N frequency-domain samples of the discrete Fourier transform and
+ * stores them in the components vector. The components are represented by the
+ * fourier_component struct, which contains the angular velocity, amplitude,
+ * phase, and degree of each component.
+ *
+ * The function assumes that the input samples are uniformly spaced in time.
+ *
+ * @param components A vector to store the computed frequency-domain components.
+ * @param positions A map of time stamps to position values.
+ */
 void discrete_fourier_transform(std::vector<fourier_component>& components,
                                 const std::map<float, float>& positions) {
     const int N = positions.size();
@@ -127,6 +184,16 @@ void discrete_fourier_transform(std::vector<fourier_component>& components,
     }
 }
 
+/**
+ * @brief Reconstructs a time-series signal from a set of Fourier components.
+ *
+ * This function takes in a set of Fourier components and a map of time stamps to values.
+ * It then reconstructs the original signal by summing the components at each time stamp.
+ *
+ * @param components The set of Fourier components to reconstruct from.
+ * @param time_stamps The map of time stamps to values.
+ * @return The reconstructed time-series signal.
+ */
 std::map<float, float> reconstruct_signal(
     const std::vector<fourier_component>& components,
     const std::map<float, float>& time_stamps){
@@ -143,6 +210,20 @@ std::map<float, float> reconstruct_signal(
     return reconstructed;
 }
 
+/**
+ * @brief PID control logic, with a custom implementation.
+ *
+ * This function takes in a map of time stamps to values and a file name.
+ * It applies a custom PID control logic, which consists of computing the running
+ * average of a window size (past samples only), computing the error between the
+ * running average and the current position, adjusting the proportional term
+ * based on the error, taking slope half point (between PI value and current
+ * value), and smoothing value of the PI output. The results are written to the
+ * specified file.
+ *
+ * @param positions The map of time stamps to values.
+ * @param file_name The file name to write the results to.
+ */
 void PID_customed(const std::map<float, float>& positions, const std::string file_name) {
     /* PID control logic:
     - Compute running average of a window size (past samples only)
@@ -199,6 +280,25 @@ void PID_customed(const std::map<float, float>& positions, const std::string fil
     }
 }
 
+/**
+ * @brief A Kalman filter with a PID controller in the loop.
+ *
+ * This function implements a Kalman filter that uses a PID controller to generate
+ * a control signal that is fed into the Kalman filter. The PID controller is based
+ * on a running average of the measurements, and the integral of the error between
+ * the running average and the current measurement.
+ *
+ * The Kalman filter is used to estimate the state of the system. The state is
+ * updated based on the measurement and the control signal generated by the PID
+ * controller.
+ *
+ * The output of the function is a CSV file that contains the time, running average,
+ * position error, PI output, smoothed output, PID output, Kalman estimate, and
+ * Kalman gain.
+ *
+ * @param positions A map of time to position measurements.
+ * @param file_name The name of the file to write the output to.
+ */
 void Kalman_filter(const std::map<float, float>& positions, const std::string file_name) {
     // PID Coefficients
     const int window_size = 5;
@@ -257,6 +357,22 @@ void Kalman_filter(const std::map<float, float>& positions, const std::string fi
     }
 }
 
+/**
+ * @brief Implements an alternative Kalman filter for position and velocity estimation.
+ *
+ * This function performs a Kalman filter on a series of position measurements
+ * provided in the input map, estimating both the position and velocity of the system.
+ * The function outputs a CSV file with columns for time, predicted position, filtered 
+ * position, position error (innovation), and Kalman gains for position and velocity.
+ *
+ * The filter uses a 1D state vector composed of position and velocity. It operates
+ * iteratively over each time step, performing a prediction step followed by an update 
+ * step. The prediction step uses the current state estimate to predict the next state, 
+ * while the update step corrects the predicted state using the new measurement.
+ *
+ * @param positions A map of timestamp to position measurements.
+ * @param file_name The name of the output CSV file to write the filtered results.
+ */
 void alternative_Kalman_filter(const std::map<float, float>& positions, const std::string file_name) {
     if (positions.size() < 2) {
         std::cout << "Not enough data for filtering." << std::endl;
@@ -331,6 +447,23 @@ void alternative_Kalman_filter(const std::map<float, float>& positions, const st
     out.close();
 }
 
+/**
+ * @brief Implements a Luenberger observer for a 2nd order system.
+ *
+ * @details Estimates the position and velocity of a system using a Luenberger observer.
+ *          The observer is tuned with two gains (L1, L2).
+ *          The output is a CSV file with the following columns:
+ *              - time
+ *              - measured position
+ *              - estimated position
+ *              - error (measured - estimated)
+ *              - L1 gain
+ *              - L2 gain
+ *              - estimated velocity
+ *
+ * @param positions map of timestamps to position values
+ * @param file_name name of the output CSV file
+ */
 void Luenberger_observer(const std::map<float, float>& positions, const std::string file_name) {
     if (positions.size() < 2) return;
 
@@ -370,6 +503,23 @@ void Luenberger_observer(const std::map<float, float>& positions, const std::str
     out.close();
 }
 
+/**
+ * @brief Implements a Linear Quadratic Regulator (LQR) observer for a 2nd order system.
+ *
+ * @details Estimates the position and velocity of a system using a LQR observer.
+ *          The observer is tuned with two gains (K1, K2) derived by solving the Riccati equation.
+ *          The output is a CSV file with the following columns:
+ *              - time
+ *              - measured position
+ *              - estimated position
+ *              - error (measured - estimated)
+ *              - K1 gain
+ *              - K2 gain
+ *              - estimated velocity
+ *
+ * @param positions map of timestamps to position values
+ * @param file_name name of the output CSV file
+ */
 void LQR_observer(const std::map<float, float>& positions, const std::string file_name) {
     if (positions.size() < 2) return;
 
@@ -409,6 +559,20 @@ void LQR_observer(const std::map<float, float>& positions, const std::string fil
     out.close();
 }
 
+/**
+ * @brief Implements an extended Kalman filter for a 2nd order system.
+ *
+ * @details Estimates the position and velocity of a system using an extended Kalman filter.
+ *          The filter is tuned with two parameters (process noise and measurement noise).
+ *          The output is a CSV file with the following columns:
+ *              - time
+ *              - predicted position
+ *              - filtered position
+ *              - position error
+ *
+ * @param positions map of timestamps to position values
+ * @param file_name name of the output CSV file
+ */
 void extended_Kalman_filter(const std::map<float, float>& positions, const std::string file_name) {
     if (positions.size() < 2) return;
 
