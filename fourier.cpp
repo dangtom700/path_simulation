@@ -335,7 +335,7 @@ void Luenberger_observer(const std::map<float, float>& positions, const std::str
     if (positions.size() < 2) return;
 
     std::ofstream out(file_name);
-    out << "time,measured_position,estimated_position\n";
+    out << "time,measured_position,estimated_position, error, L1, L2, estimated_velocity\n";
 
     float x = 0.0f;   // estimated position
     float v = 0.0f;   // estimated velocity
@@ -363,7 +363,7 @@ void Luenberger_observer(const std::map<float, float>& positions, const std::str
         x = x_pred + L1 * error;
         v = v + L2 * error;
 
-        out << t << "," << z << "," << x << "\n";
+        out << t << "," << z << "," << x << "," << error << "," << L1 << "," << L2 << "," << v << "\n";
         prev_time = t;
     }
 
@@ -374,7 +374,7 @@ void LQR_observer(const std::map<float, float>& positions, const std::string fil
     if (positions.size() < 2) return;
 
     std::ofstream out(file_name);
-    out << "time,measured_position,estimated_position\n";
+    out << "time,measured_position,estimated_position, error, K1, K2, estimated_velocity\n";
 
     float x = 0.0f;
     float v = 0.0f;
@@ -402,7 +402,7 @@ void LQR_observer(const std::map<float, float>& positions, const std::string fil
         x = x_pred + K1 * error;
         v = v + K2 * error;
 
-        out << t << "," << z << "," << x << "\n";
+        out << t << "," << z << "," << x << "," << error << "," << K1 << "," << K2 << "," << v << "\n";
         prev_time = t;
     }
 
