@@ -8,7 +8,7 @@ This is an effort in modeling the path of a trajectory using multiple methods in
 - [Forward kinematics transformation matrix (matrix manipulation, commonly used in robot manipulators)](https://en.wikipedia.org/wiki/Forward_kinematics)
 - [Closed loop 4 bar linkage system](https://en.wikipedia.org/wiki/Four-bar_linkage)
 
-## Background
+## Modeling path with Fourier series
 
 ### Fouries series in continuous time domain
 
@@ -60,6 +60,24 @@ Phase: $\phi_k = \arg(X[k])$
 
 Angular frequency: $\omega_k = \frac{2\pi k}{T}$
 
-## Carry out the project
+## Modeling path in close loop with 4 bar linkage system
 
-### Modeling trajectory based on the Fourier series
+Assuming a 4-side geometry that consist of 4 bar of different dimensions and they form 4 angles so that the total inner angles is 360 degree.
+
+4 bar linkage problems often come in 2 types:
+
+- close loop
+- open loop
+
+In a close loop system, there are a unique constraint of the sum of 4 inner angles must add up to 360 degrees
+
+Formula used to compute the location of this system (also applied to open system):
+
+- $\frac{BD}{sinBCD}=\frac{BC}{sinBDC}=\frac{CD}{sinCBD}$
+- $\frac{BA}{sinBDA}=\frac{BD}{sinBAD}=\frac{AD}{sinABD}$
+- $\frac{AB}{sinACB}=\frac{BC}{sinBAC}=\frac{AC}{sinABC}$
+- $\frac{AD}{sinACD}=\frac{AC}{sinADC}=\frac{CD}{sinCAD}$
+- $BD=\sqrt{AB^2+AD^2-2\times AB\times ADcosBAD}=\sqrt{BC^2+CD^2-2\times BC\times CDcosBCD}$
+- $AC=\sqrt{AB^2+BC^2-2\times AB\times BCcosABC}=\sqrt{AD^2+CD^2-2\times AD\times CDcosADC}$
+
+The known parameters are the previous positions of each linkage and their angles with one known angle change that drive the rest of the parameters.

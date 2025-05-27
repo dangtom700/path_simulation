@@ -8,6 +8,7 @@
 #include <numeric>
 
 const float cap_threshold = 10.0f;
+const std::string root = "fourier_data/";
 
 // Compact Fourier series
 struct fourier_component {
@@ -76,7 +77,7 @@ std::map<float, float> compute_trajectory(const float& initial_condition,
 void report_trajectory(fourier_component fourier_series[], const int& fourier_series_size,
                        const std::map<float, float>& positions, const std::string& filename) {
     // Component report
-    std::ofstream componentFile(filename + "component.csv");
+    std::ofstream componentFile(root + filename + "component.csv");
     componentFile << "n,angular_velocity,amplitude,phase\n";
 
     for (int i = 0; i < fourier_series_size; i++) {
@@ -86,7 +87,7 @@ void report_trajectory(fourier_component fourier_series[], const int& fourier_se
     componentFile.close();
 
     // Position report
-    std::ofstream positionFile(filename + "position.csv");
+    std::ofstream positionFile(root + filename + "position.csv");
     positionFile << "time,position\n";
 
     for (const auto& position : positions) {
@@ -244,7 +245,7 @@ void PID_customed(const std::map<float, float>& positions, const std::string fil
     float previous_output = 0.0f;
     bool initialized = false;
 
-    std::ofstream outputFile(file_name);
+    std::ofstream outputFile(root + file_name);
     outputFile << "time, running_average" << "(" << window_size << "), position_error, PI_output, smoothed_output, total_output\n";
 
     for (const auto& [time, current_position] : positions) {
@@ -318,7 +319,7 @@ void Kalman_filter(const std::map<float, float>& positions, const std::string fi
     float previous_output = 0.0f;
     bool initialized = false;
 
-    std::ofstream outputFile(file_name);
+    std::ofstream outputFile(root + file_name);
     outputFile << "time, running_average" << "(" << window_size << "), position_error, "
                << "PI_output, smoothed_output, PID_out, kalman_estimate, kalman_gain\n";
 
@@ -379,7 +380,7 @@ void alternative_Kalman_filter(const std::map<float, float>& positions, const st
         return;
     }
 
-    std::ofstream out(file_name);
+    std::ofstream out(root + file_name);
     if (!out.is_open()) {
         std::cerr << "Failed to open file for writing: " << file_name << std::endl;
         return;
@@ -467,7 +468,7 @@ void alternative_Kalman_filter(const std::map<float, float>& positions, const st
 void Luenberger_observer(const std::map<float, float>& positions, const std::string file_name) {
     if (positions.size() < 2) return;
 
-    std::ofstream out(file_name);
+    std::ofstream out(root + file_name);
     out << "time,measured_position,estimated_position, error, L1, L2, estimated_velocity\n";
 
     float x = 0.0f;   // estimated position
@@ -523,7 +524,7 @@ void Luenberger_observer(const std::map<float, float>& positions, const std::str
 void LQR_observer(const std::map<float, float>& positions, const std::string file_name) {
     if (positions.size() < 2) return;
 
-    std::ofstream out(file_name);
+    std::ofstream out(root + file_name);
     out << "time,measured_position,estimated_position, error, K1, K2, estimated_velocity\n";
 
     float x = 0.0f;
@@ -576,7 +577,7 @@ void LQR_observer(const std::map<float, float>& positions, const std::string fil
 void extended_Kalman_filter(const std::map<float, float>& positions, const std::string file_name) {
     if (positions.size() < 2) return;
 
-    std::ofstream out(file_name);
+    std::ofstream out(root + file_name);
     out << "time,predicted_position,filtered_position,position_error\n";
 
     float x = 0.0f; // position
