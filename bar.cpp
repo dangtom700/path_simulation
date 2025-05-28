@@ -1,9 +1,6 @@
-#include <iostream>
-#include <cmath>
-#include <random>
-#include <fstream>
-#include <vector>
 #include <iomanip>
+
+#include "fourier.h"
 
 struct linkage_bar {
     float length;
@@ -21,7 +18,13 @@ struct linkage_bar {
 
     void update_angle(float delta_time) {
         angle_rad += angular_velocity * delta_time;
-        angle_rad = fmod(angle_rad, 2.0f * M_PI);
+        // Normalize between -PI and PI
+        while (angle_rad > M_PI) {
+            angle_rad -= 2 * M_PI;
+        }
+        while (angle_rad < -M_PI) {
+            angle_rad += 2 * M_PI;
+        }
     }
 };
 
@@ -44,21 +47,23 @@ float compute_end_effector_distance(float x, float y) {
 }
 
 int main() {
-    const int num_bars = 3;
+    const int num_bars = 25;
     const float max_length = 7.0f;
     const float max_angle = 1.0f * M_PI;
     const float max_velocity = 3.0f;
     const int time_steps = 1000;
     const float delta_time = 0.1f;
+    const std::string root = "bar_data/";
+    std::map<float, float> positions;
 
     auto bars = generate_bars(num_bars, max_length, max_angle, max_velocity);
 
-    std::ofstream csv_file("bar_data/joint_positions.csv");
+    std::ofstream csv_file(root + "joint_positions.csv");
     if (!csv_file) {
         std::cerr << "Failed to open CSV file." << std::endl;
         return 1;
     }
-    std::ofstream angle_file("bar_data/joint_angles.csv");
+    std::ofstream angle_file(root + "joint_angles.csv");
     if (!angle_file) {
         std::cerr << "Failed to open angle file." << std::endl;
         return 1;
@@ -106,9 +111,53 @@ int main() {
             angle_file << bar.angle_rad << ",";
         }
         angle_file << distance << "\n";
+
+        positions[time] = distance;
     }
 
     csv_file.close();
     std::cout << "Simulation complete. Data written to joint_positions.csv\n";
+
+    // ----- Inverting signal to build Fourier model -----
+    const int max_degree = num_bars;
+
+    std::vector<fourier_component> discrete_fourier_series;
+    discrete_fourier_series.reserve(max_degree);
+    fourier_component fourier_series[max_degree];
+
+    discrete_fourier_transform(discrete_fourier_series, positions);
+    std::map<float, float> reconstructed_positions = reconstruct_signal(discrete_fourier_series, positions);
+    for(int i = 0; i < max_degree; i++){
+        fourier_series[i].amplitude = discrete_fourier_series[i].amplitude;
+        fourier_series[i].angular_velocity = discrete_fourier_series[i].angular_velocity;
+        fourier_series[i].phase = discrete_fourier_series[i].phase;
+        fourier_series[i].n_degree = discrete_fourier_series[i].n_degree;
+    }
+    report_trajectory(fourier_series, max_degree, reconstructed_positions, root + "inverted_trajectory_");
+
+    // ----- PID controller -----
+    PID_customed(positions, root + "PID1.csv");
+    PID_customed(reconstructed_positions, root + "PID2.csv");
+
+    // ----- Kalman Filter -----
+    Kalman_filter(positions, root + "kalman1.csv");
+    Kalman_filter(reconstructed_positions, root + "kalman2.csv");
+
+    // ----- Alternative Kalman Filter -----
+    alternative_Kalman_filter(positions, root + "alternative_kalman1.csv");
+    alternative_Kalman_filter(reconstructed_positions, root + "alternative_kalman2.csv");
+
+    // ----- Luenberger observer -----
+    Luenberger_observer(positions, root + "luenberger1.csv");
+    Luenberger_observer(reconstructed_positions, root + "luenberger2.csv");
+
+    // ----- LQR observer -----
+    LQR_observer(positions, root +  "LQR1.csv");
+    LQR_observer(reconstructed_positions, root +  "LQR2.csv");
+
+    // ----- Extended Kalman Filter -----
+    extended_Kalman_filter(positions, root +  "extended_kalman1.csv");
+    extended_Kalman_filter(reconstructed_positions, root +  "extended_kalman2.csv");
+
     return 0;
 }
