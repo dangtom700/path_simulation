@@ -47,7 +47,7 @@ float compute_end_effector_distance(float x, float y) {
 }
 
 int main() {
-    const int num_bars = 25;
+    const int num_bars = 50;
     const float max_length = 7.0f;
     const float max_angle = 1.0f * M_PI;
     const float max_velocity = 3.0f;
@@ -116,7 +116,7 @@ int main() {
     }
 
     csv_file.close();
-    std::cout << "Simulation complete. Data written to joint_positions.csv\n";
+    angle_file.close();
 
     // ----- Inverting signal to build Fourier model -----
     const int max_degree = num_bars;
