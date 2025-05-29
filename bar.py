@@ -12,7 +12,7 @@ def get_time_str():
 
 image_root = "bar_image/"
 os.makedirs(image_root, exist_ok=True)
-iteration = 100
+iteration = 1000
 
 subprocess.run(["g++", "-o", "bar", "bar.cpp", "-lm"])
 
