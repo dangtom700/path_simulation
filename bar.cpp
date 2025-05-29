@@ -47,7 +47,7 @@ float compute_end_effector_distance(float x, float y) {
 }
 
 int main() {
-    const int num_bars = 50;
+    const int num_bars = 10;
     const float max_length = 7.0f;
     const float max_angle = 1.0f * M_PI;
     const float max_velocity = 3.0f;

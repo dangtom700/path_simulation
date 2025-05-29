@@ -22,7 +22,8 @@ for i in range(iteration):
 
     series_name = get_time_str()
     
-    for bar in range(int(len(df.columns) / 2)-1):
+    for bar in range(int(len(df.columns) / 2)-2):
+        bar = bar + 1
         # Time and signals
         t = df["time"].to_numpy()
         x = df[f"x{bar}"].to_numpy()
