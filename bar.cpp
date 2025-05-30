@@ -46,15 +46,23 @@ float compute_end_effector_distance(float x, float y) {
     return std::sqrt(x * x + y * y);
 }
 
-int main() {
+int main(int argc, char* argv[]) {
+    // Default values
     const int num_bars = 3;
     const float max_length = 7.0f;
-    const float max_angle = 1.0f * M_PI;
-    const float max_velocity = 3.0f;
-    const int time_steps = 1000;
+    const float max_angle = 2.0f * M_PI;
+    const float max_velocity = 5.0f;
     const float delta_time = 0.1f;
     const std::string root = "bar_data/";
     std::map<float, float> positions;
+    int time_steps = 1000;
+
+    // Decode command line arguments
+    for (int i = 1; i < argc; ++i) {
+        if (std::string(argv[i]) == "-t") {
+            time_steps = std::stoi(argv[++i]);
+        }
+    }
 
     auto bars = generate_bars(num_bars, max_length, max_angle, max_velocity);
 
@@ -117,6 +125,15 @@ int main() {
 
     csv_file.close();
     angle_file.close();
+
+    std::ofstream report("report.md", std::ios::app);
+    report << "\n**Configuration**\n\n";
+    for (int i = 0; i < num_bars; i++) {
+        report << "Bar " << i << " length: " << bars[i].length << ".\n";
+        report << "Bar " << i << " angle: " << bars[i].angle_rad << ".\n";
+        report << "Bar " << i << " velocity: " << bars[i].angular_velocity << ".\n\n";
+    }
+    report.close();
 
     // // ----- Inverting signal to build Fourier model -----
     // const int max_degree = num_bars;
