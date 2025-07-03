@@ -8,14 +8,14 @@ import os
 def get_time_str():
     import datetime
     now = datetime.datetime.now()
-    return now.strftime("%Y%m%d%H%M%S")
+    return now.strftime("%Y%m%d%H%M%S%f")
 
 image_root = "bar_image/"
 os.makedirs(image_root, exist_ok=True)
-iteration = 1000
+iteration = 2000
 
 subprocess.run(["g++", "-o", "bar", "bar.cpp", "-lm"])
-time_steps = [5000, 2000, 1000]
+time_steps = [2000, 1000]
 
 for time_step in time_steps:
     for i in range(iteration):
